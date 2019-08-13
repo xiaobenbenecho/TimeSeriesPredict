@@ -9,13 +9,14 @@ Created on Thu Apr 25 17:07:28 2019
 
 ######GLOBAL variables#########################################################
 ############agg_level: 'W'- weekly aggregated level 'D'- daily aggregated level
-agg_def = ['country', 'vendor', 'product_range']
-agg_level = 'W'
+agg_def = ['country', 'vendor', 'product']
+agg_level = 'D'
 smooth_type_list = ['normal', 'outliers_interpolated_mean', 'outliers_interpolated_iqr']
 
 ################import the data################################################
 import pandas as pd
 data = pd.read_csv('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\NewData\\SELL_THROUGH_PC.csv')
+data = pd.read_csv('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\NewData\\SELL_THROUGH_PRINTER.csv')
 data.columns
 
 ##############Keep only the useful rows########################################
@@ -27,15 +28,14 @@ data.columns = ['date', 'country', 'vendor','product_range', 'product', 'units',
 
 ##############Filter the feasible products#####################################
 from functions import *
+cutoff = [30, 0.6]
 summary_data, data_grouped, total_number_product = filter_feasible_product(data
-      = data, agg_level = agg_level, agg_def = agg_def)
+      = data, cutoff = cutoff, agg_level = agg_level, agg_def = agg_def)
 
 
 #######################Iteration of all feasible products on the univariate models########
 
 ################iterate all models on all feasible products############################
-
-#temp1 = summary_data.head(10)
 from func_automation import *
 for smooth_type in smooth_type_list:
     
@@ -47,9 +47,9 @@ for smooth_type in smooth_type_list:
     outlier_file_name = 'df_outliers_' +  smooth_type + '_' + agg_level
     
     
-    df_inclusive.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsProjectSellThroughPC\\' + inclusion_file_name + '.pkl')
-    df_exclusive.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsProjectSellThroughPC\\' + exclusion_file_name + '.pkl')
-    df_outliers.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsProjectSellThroughPC\\' + outlier_file_name + '.pkl')
+    df_inclusive.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsSellThroughPrinter\\' + inclusion_file_name + '.pkl')
+    df_exclusive.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsSellThroughPrinter\\' + exclusion_file_name + '.pkl')
+    df_outliers.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsSellThroughPrinter\\' + outlier_file_name + '.pkl')
 
 
 pe_cols = [col for col in df_inclusive.columns if 'pe' in col]
@@ -59,13 +59,16 @@ temp = temp.apply(pd.to_numeric)
 temp.mean()
 
 #############################iterate for just one model#################################
-model = 'state_space_model'
-from func_automation import *
+temp1 = summary_data.sort_values(by = 'period').head(60)
 
-#temp1 = summary_data.head(10)
+
+model = 'MTM'
+from func_automation import *
+temp1 = summary_data.head(10)
+
 for smooth_type in smooth_type_list:
     
-    df_inclusive, df_exclusive = automation_single(summary_data.index, data_grouped, agg_level = agg_level, smooth_type = smooth_type, model = model)
+    df_inclusive, df_exclusive = automation_single(temp1.index, data_grouped, agg_level = agg_level, smooth_type = smooth_type, model = model)
     
     ########store the data######
     inclusion_file_name = 'sample_df_inclusive_' + smooth_type + '_' + agg_level + '_' + model
@@ -77,26 +80,8 @@ for smooth_type in smooth_type_list:
     df_exclusive.to_pickle('C:\\Users\\yzhang\\Desktop\\KTPAssociate\\Data\\ResultsProjectSellThroughPC\\' + exclusion_file_name + '.pkl')
 
 
-   
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+     
+       
 ##############Distributin of the products according to noDays##################
 ##############Majority of the products have observations less than 100#########
 from EDA import *

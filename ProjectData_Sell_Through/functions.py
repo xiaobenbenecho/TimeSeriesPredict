@@ -126,3 +126,7 @@ def goodness_prediction_interval(ts_test, prediction_interval):
         acc_pi = np.sum((ts_test >= prediction_interval[:,0])&(ts_test <= prediction_interval[:,1]))/len(ts_test)
     avg_diff_pi = mean(prediction_interval[:, 1] - prediction_interval[:, 0])
     return acc_pi, avg_diff_pi
+
+#################################################################################
+######Remove Trend and Seasonality
+#################################################################################

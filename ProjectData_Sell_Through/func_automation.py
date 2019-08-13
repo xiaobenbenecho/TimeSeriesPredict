@@ -22,7 +22,7 @@ def automation_model_iteration(original_df, smoothed_df, smooth_type, inclusion,
     from func_prophet_model import automation_prophet_model
     from func_benchmarks import _naive, _average
     from func_MTM import MTM_model, MTM_slides_window
-    
+    from func_state_space_models import state_space_SARIMAX, state_space_UC
 
     ##for each model
     ##RETURN: The model itself, the prediction, the prediction intervals 
@@ -38,6 +38,12 @@ def automation_model_iteration(original_df, smoothed_df, smooth_type, inclusion,
     #MTM with rolling window results
     window_size, pe, acc_pi, avg_diff_pi = MTM_slides_window(smoothed_df, inclusion)
     
+    #state_space_model: SARIMAX
+    pe_SARIMAX, acc_pi_SARIMAX, avg_diff_pi_SARIMAX = state_space_SARIMAX(smoothed_df)
+                
+    #state_spac_model: UnobservedComponent
+    pe_UC, acc_pi_UC, avg_diff_pi_UC = state_space_UC(smoothed_df)
+    
     #benchmark model: naive
     naive_mdl, pe_naive, acc_pi_naive, avg_diff_pi_naive = _naive(original_df, smoothed_df, smooth_type)
     
@@ -50,6 +56,8 @@ def automation_model_iteration(original_df, smoothed_df, smooth_type, inclusion,
             pe_prophet, acc_pi_prophet, avg_diff_pi_prophet,
             pe_MTM, acc_pi_MTM, avg_diff_pi_MTM,
             window_size, pe, acc_pi, avg_diff_pi,
+            pe_SARIMAX, acc_pi_SARIMAX, avg_diff_pi_SARIMAX,
+            pe_UC, acc_pi_UC, avg_diff_pi_UC,
             pe_naive, acc_pi_naive, avg_diff_pi_naive,
             pe_average, acc_pi_average, avg_diff_pi_average)
 
@@ -59,6 +67,7 @@ def automation(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal'
     warnings.filterwarnings("ignore")
     from functions import test_stationarity
     from func_pre_process import pre_process_ts_bin, pre_process_spikes, pre_process_fill_absent_values
+    from func_MTM import MTM_model
     import copy
     import pandas as pd
     #data_filter = data_bigger500
@@ -105,6 +114,8 @@ def automation(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal'
             pe_prophet, acc_pi_prophet, avg_diff_pi_prophet,
             pe_MTM, acc_pi_MTM, avg_diff_pi_MTM,
             window_size, pe, acc_pi, avg_diff_pi,
+            pe_SARIMAX, acc_pi_SARIMAX, avg_diff_pi_SARIMAX,
+            pe_UC, acc_pi_UC, avg_diff_pi_UC,
             pe_naive, acc_pi_naive, avg_diff_pi_naive,
             pe_average, acc_pi_average, avg_diff_pi_average) = automation_model_iteration(original_df = df0, smoothed_df = df1, smooth_type = smooth_type, inclusion = inclusion, stationarity = stationarity_status)
             
@@ -112,6 +123,8 @@ def automation(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal'
             pe_prophet, acc_pi_prophet, avg_diff_pi_prophet,
             pe_MTM, acc_pi_MTM, avg_diff_pi_MTM,
             window_size, pe, acc_pi, avg_diff_pi,
+            pe_SARIMAX, acc_pi_SARIMAX, avg_diff_pi_SARIMAX,
+            pe_UC, acc_pi_UC, avg_diff_pi_UC,
             pe_naive, acc_pi_naive, avg_diff_pi_naive,
             pe_average, acc_pi_average, avg_diff_pi_average]}
             
@@ -126,7 +139,9 @@ def automation(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal'
     df_return_inclusive.columns = ['stationarity_status', 'best_order_arma', 'pe_arma', 'acc_pi_arma', 'avg_diff_pi_arma',
             'pe_prophet', 'acc_pi_prophet', 'avg_diff_pi_prophet',
             'pe_MTM', 'acc_pi_MTM', 'avg_diff_pi_MTM',
-             'window_size', 'pe_MTM_RW', 'acc_pi_MTM_RW', 'avg_diff_pi_MTM_RW',
+            'window_size', 'pe_MTM_RW', 'acc_pi_MTM_RW', 'avg_diff_pi_MTM_RW',
+            'pe_SARIMAX', 'acc_pi_SARIMAX', 'avg_diff_pi_SARIMAX', 
+            'pe_UC', 'acc_pi_UC', 'avg_diff_pi_UC',
             'pe_naive', 'acc_pi_naive', 'avg_diff_pi_naive',
             'pe_average', 'acc_pi_average', 'avg_diff_pi_average']
     if df_return_exclusive.empty:  
@@ -152,7 +167,7 @@ def automation(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal'
 ####################smooth_type: whether the data has been smoothed################
 ####################inclusion: whether to include or exclusde weekends data####
 ####################stationarity: the stationariyt status of the dataframe#####   
-def automation_single(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal', model = 'MTM_slides_window'):
+def automation_single(index_list, data_grouped, agg_level = 'D', smooth_type = 'normal', model = 'MTM'):
     import warnings
     warnings.filterwarnings("ignore")
     from functions import test_stationarity
@@ -161,7 +176,8 @@ def automation_single(index_list, data_grouped, agg_level = 'D', smooth_type = '
     import numpy as np
     import pandas as pd
     from func_state_space_models import state_space_SARIMAX, state_space_UC
-    #from func_prophet_model import automation_prophet_model
+    from func_MTM import MTM_model
+    from func_prophet_model import automation_prophet_model
     
             
     df_return_inclusive  = pd.DataFrame()
@@ -192,7 +208,23 @@ def automation_single(index_list, data_grouped, agg_level = 'D', smooth_type = '
             ################Check the stationarty######################################
             stationarity_status =  test_stationarity(df1.units)
             
-            ###############do the prediction using the MTM model##################
+            ###############do the prediction using the MTM model#######################
+            if model == 'MTM':
+                if stationarity_status == True:
+                    pe, acc_pi, avg_diff_pi = MTM_model(df1)
+                else:
+                    pe, acc_pi, avg_diff_pi = MTM_model_no_trend(df1)
+                    
+                
+                row = {index: [pe, acc_pi, avg_diff_pi]}
+                row = pd.DataFrame(row).T
+                
+                if inclusion == True:
+                    df_return_inclusive = df_return_inclusive.append(row)
+                else:
+                    df_return_exclusive = df_return_exclusive.append(row)
+                    
+                #df_return_inclusive.columns = ['pe', 'acc_pi', 'avg_diff_pi']
             #df_return_inclusive.columns = ['pe', 'acc_pi', 'avg_diff_pi']       
             if model == 'state_space_model':
                 pe, acc_pi, avg_diff_pi = state_space_SARIMAX(df1)
@@ -205,18 +237,18 @@ def automation_single(index_list, data_grouped, agg_level = 'D', smooth_type = '
                     df_return_inclusive = df_return_inclusive.append(row)
                 else:
                     df_return_exclusive = df_return_exclusive.append(row)
-            else:# model == 'Prophet'  
-                for changepoint_number in [0, 5, 10, 20, 25, 50]:
-                    for changepoint_scale in [0.005, 0.05, 0.5]:
-                        prophet_mdl, pe, acc_pi, avg_diff_pi = automation_prophet_model(df0, df1, smooth_type, changepoint_number, changepoint_scale, inclusion)
-                        row = {index: [tuple([changepoint_number, changepoint_scale]), pe, acc_pi, avg_diff_pi]}
-                        row = pd.DataFrame(row).T
-                        
-                        if inclusion == True:
-                            df_return_inclusive = df_return_inclusive.append(row)
-                        else:
-                            df_return_exclusive = df_return_exclusive.append(row)
-                
+#            else:# model == 'Prophet'  
+#                for changepoint_number in [0, 5, 10, 20, 25, 50]:
+#                    for changepoint_scale in [0.005, 0.05, 0.5]:
+#                        prophet_mdl, pe, acc_pi, avg_diff_pi = automation_prophet_model(df0, df1, smooth_type, changepoint_number, changepoint_scale, inclusion)
+#                        row = {index: [tuple([changepoint_number, changepoint_scale]), pe, acc_pi, avg_diff_pi]}
+#                        row = pd.DataFrame(row).T
+#                        
+#                        if inclusion == True:
+#                            df_return_inclusive = df_return_inclusive.append(row)
+#                        else:
+#                            df_return_exclusive = df_return_exclusive.append(row)
+#                
                 #df_return_inclusive.columns = ['changepoint_number_scale', 'pe', 'acc_pi', 'avg_diff_pi']
             
     if len(df_return_inclusive.columns) == 3: 

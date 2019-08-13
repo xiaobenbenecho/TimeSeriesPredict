@@ -272,6 +272,102 @@ def MTM_slides_window(df, inclusion = True):
 
 
 
+#################################MTM without Trend and Seasoanlity##################################
+def MTM_model_no_trend(df):
+    #input: the df for analysis:
+    #output: the pe, acc_pi, width_pi
+    
+    import pandas as pd
+    import numpy as np
+    import copy
+    from math import ceil
+    
+    ##############Step1: Remove trend and seasonality##############################
+    from statsmodels.tsa.seasonal import seasonal_decompose
+        
+    #########################If the length of the ts is shorter than 130#####
+    
+    #############STEPS:
+    #convert the df to binned values, with bin name as the average of bin boundaries    
+    number_quantile = min(ceil(len(df)/4), 100)
+    
+    while True :
+        bins = np.unique(np.quantile(df.iloc[:, 0], np.arange(0, number_quantile+1)/number_quantile)) 
+        group_names = []
+        corr_bin_name = []
+        bin_units = []
+        for i in range(1,len(bins)):
+            name = (bins[i-1]+ bins[i])/2
+            group_names.append(name)
+ 
+        bins[0] = bins[0] - 0.1 
+        
+        #the value that maps the observation to a unique bin
+        bin_units = (pd.cut(df.units, bins, labels = group_names)).astype(float)
+        #the bin number
+        corr_bin_name =  (pd.cut(df.units, bins, labels = range(1, len(bins)))).astype(int)
+        number_quantile = ceil(number_quantile/2)
+        if 1 not in pd.Series(corr_bin_name).value_counts().values:
+            break
+    
+    #check whether bins and group names is unique
+    if not pd.Series(bins).is_unique:
+        print (bins)
+    if not pd.Series(group_names).is_unique:
+        print (group_names)
+    
+    df.units = bin_units
+ 
+    
+    #calcuate the MTM
+    df_train = df[0: ceil(len(df)*0.9)]
+    df_test = df[ceil(len(df)*0.9):]
+    
+        ###Input: the converted time series, the bins.    
+    n = len(group_names)
+    
+    M = [[0]*n for _ in range(n)]
+
+    for (i,j) in zip(corr_bin_name, corr_bin_name[1:len(df_train)+1]):
+        #print (i,j)
+        M[i-1][j-1] += 1
+
+    #now convert to probabilities:
+    for row in M:
+        s = sum(row)
+        if s > 0:
+            row[:] = [f/s for f in row]
+    
+    
+    #do the prediction and calcualte required values.
+    last = group_names.index(df_train.iloc[-1, 0])
+    prediction = []
+    
+    for i in range(1, len(df_test) + 1):
+        temp = M[last].index(max(M[last]))
+
+        #####calcualte the prediction value.
+        last = copy.deepcopy(temp)
+        prediction.append(group_names[temp])
+   
+    #calculate the prediction error
+    from sklearn.metrics import mean_squared_error
+    from math import sqrt
+    rmse = sqrt(mean_squared_error(df_test, prediction)) 
+    
+    
+    ###################Add back the trend and seasonality#######################
+    
+    
+    #####calcualte the prediction interval#######
+    from functions import forecast_pred_int, goodness_prediction_interval
+    prediction_interval = forecast_pred_int(prediction, rmse, alpha = 0.05)
+    acc_pi, width_pi = goodness_prediction_interval(df_test, prediction_interval)
+      
+    return rmse, acc_pi, width_pi
+
+
+
 
 
 

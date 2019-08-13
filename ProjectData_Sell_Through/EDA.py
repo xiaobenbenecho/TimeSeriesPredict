@@ -37,10 +37,13 @@ def top_seller_by_country_vendor(data, summary_data, category = ['country', 'ven
 
 
 ###############Sale volume by weekdays or each month in each country ##########
-def units_on_weekday_or_month(data, agg_type = 'month'):
+def units_on_weekday_or_month(data, agg_type = 'month', agg_def = ['country','vendor','product']):
     import pandas as pd
+    import numpy as np
     
-    aggregation = ['date','country','vendor','product']
+    aggregation = agg_def
+    aggregation.insert(0, 'date')
+
     
     f = {'units':['sum'], 'revenue':['sum']}
     summary = data.groupby(aggregation).agg(f)
@@ -57,16 +60,21 @@ def units_on_weekday_or_month(data, agg_type = 'month'):
     return summary1
 
 
-def nonexistent_values_weekday(data):
+def nonexistent_values_weekday(data, agg_def = ['country','vendor','product']):
     import pandas as pd
+    import numpy as np
+    
     
     data['date'] = pd.to_datetime(data['date'])
     data['weekday'] = data.date.dt.strftime("%A")
     
-    aggregation = ['country', 'vendor', 'product', 'weekday']
-    f = {'units':['sum'], 'revenue':['sum']}
+
+    aggregation = agg_def
+    aggregation.append('weekday')
+    
+    f = {'units':['sum']}
     summary = data.groupby(aggregation).agg(f)
-    summary.columns = ['units', 'revenue']
+    summary.columns = ['units']
     
     nonexistent_values = summary.unstack(level = -1)
     number_0sales = nonexistent_values['units'].isna().sum()
