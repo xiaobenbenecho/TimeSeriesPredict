@@ -1,1 +1,1 @@
-# Code for time series prediction with various univariate models
+# Code for time series prediction with various models
